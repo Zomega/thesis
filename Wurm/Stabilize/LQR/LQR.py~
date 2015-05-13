@@ -1,0 +1,66 @@
+from __future__ import division, print_function
+ 
+import numpy as np
+import scipy.linalg
+
+import click
+
+def lqr(A,B,Q,R):
+    """Solve the continuous time lqr controller.
+     
+    dx/dt = A x + B u
+     
+    cost = integral x.T*Q*x + u.T*R*u
+    """
+    #ref Bertsekas, p.151
+ 
+    #first, try to solve the ricatti equation
+    P = np.matrix(scipy.linalg.solve_continuous_are(A, B, Q, R))
+     
+    #compute the LQR gain
+    K = np.matrix(scipy.linalg.inv(R)*(B.T*P))
+     
+    return K, P
+ 
+def dlqr(A,B,Q,R):
+    """Solve the discrete time lqr controller.
+     
+     
+    x[k+1] = A x[k] + B u[k]
+     
+    cost = sum x[k].T*Q*x[k] + u[k].T*R*u[k]
+    """
+    #ref Bertsekas, p.151
+ 
+    #first, try to solve the ricatti equation
+    X = np.matrix(scipy.linalg.solve_discrete_are(A, B, Q, R))
+     
+    #compute the LQR gain
+    K = np.matrix(scipy.linalg.inv(B.T*X*B+R)*(B.T*X*A))
+     
+    eigVals, eigVecs = scipy.linalg.eig(A-B*K)
+     
+    return K, X, eigVals
+
+def parse_haskell_matrix( s ):
+    s = s[2:-4]
+    lines = s.split(" )\\n( ")
+    matrix = np.matrix(str("; ".join(lines)))
+    return matrix
+
+@click.command()
+@click.argument('a')
+@click.argument('b')
+@click.argument('q')
+@click.argument('r')
+def run_lqr(a, b, q, r):
+    A = parse_haskell_matrix( a )
+    B = parse_haskell_matrix( b )
+    Q = parse_haskell_matrix( q )
+    R = parse_haskell_matrix( r )
+
+    K, P = lqr(A,B,Q,R)
+    print((K.tolist(),P.tolist()))
+
+if __name__ == '__main__':
+    run_lqr()

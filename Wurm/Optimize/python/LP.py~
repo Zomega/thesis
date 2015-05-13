@@ -1,0 +1,21 @@
+from cvxopt import matrix, solvers
+
+from MatrixIO import load, store
+
+def solve(c, A, b):
+	c = matrix(c)
+	A = matrix(A)
+	b = matrix(b)
+	sol=solvers.lp(c,A,b)
+	x = sol['x']
+	return x
+
+A = matrix([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ])
+b = matrix([ 1.0, -2.0, 0.0, 4.0 ])
+c = matrix([ 2.0, 1.0 ])
+
+store("A.matrix", A)
+store("b.matrix", b)
+store("c.matrix", c)
+
+print solve(c=load("c.matrix"), A=load("A.matrix"), b=load("b.matrix"))

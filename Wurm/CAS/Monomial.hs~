@@ -1,0 +1,10 @@
+module Expression.Monomial where
+
+import Expression.AST
+
+data Monomial = Monomial [(Variable,Int)]
+
+-- | TODO: Shoehornable...
+
+instance Show Monomial where
+	show (Monomial m) = intercalate " " $ map (\(x,n) -> show x ++ "^" ++ show n) m

@@ -1,0 +1,9 @@
+-- | Collocation Trajectory Optimization...
+-- |
+-- | optimize over f( x_i, u_i, dt )
+-- |		x(t) => x_i
+-- |	      u(t) => u_i
+-- |		dt (in some cases, usually if endpoint / endconditions specified)
+-- |
+-- | subject x_(i+1) = x_i + dt * f( x_i, u_i )
+-- | Also enforce dynamics at the "knotpoints" -- midpoints of the third order spline of the state (assumed the control is first order spline).

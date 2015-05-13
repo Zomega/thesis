@@ -1,0 +1,8 @@
+Local Nonlinear Programming (e.g. SNOPT)
+----------------------------------------
+
+Gradient Descent style solving against contrants.
+
+Try an IPM type approach?
+
+How to find points on the feasible region to begin? Require one?

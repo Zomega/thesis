@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""
+Demo of the `streamplot` function.
+
+A streamplot, or streamline plot, is used to display 2D vector fields. This
+example shows a few features of the stream plot function:
+
+    * Varying the color along a streamline.
+    * Varying the density of streamlines.
+    * Varying the line width along a stream line.
+"""
+import numpy as np
+import matplotlib.pyplot as plt
+import click
+
+
+Y, X = np.mgrid[-3:3:300j, -3:3:300j]
+
+X = X
+Y = Y
+
+U = -1 - X**2 + Y
+V = 1 + X - Y**2
+
+print U
+
+speed = np.sqrt(U*U + V*V)
+lw = 5*speed/speed.max()
+
+#plt.quiver(X, Y, U, V, scale=100)
+
+@click.group()
+def streamplot_group():
+	pass
+
+@streamplot_group.command()
+@click.option('--style', default='autumn', type=click.Choice(['autumn', 'plain', 'thickened']))
+def streamplot(style):
+	if style == 'autumn':
+		plt.streamplot(X, Y, U, V, color=U, linewidth=2, cmap=plt.cm.autumn)
+		plt.colorbar()
+	if style == 'plain':
+		plt.streamplot(X, Y, U, V, density=[0.5, 1])
+	if style == 'thickened':
+		plt.streamplot(X, Y, U, V, density=0.6, color='k', linewidth=lw)
+
+	plt.show()
+
+plot = click.CommandCollection(sources=[streamplot_group])
+if __name__ == '__main__':
+    plot()

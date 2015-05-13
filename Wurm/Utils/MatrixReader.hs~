@@ -1,0 +1,23 @@
+module Utils.MatrixReader where
+
+import Data.Matrix
+import Data.Spreadsheet
+
+import Control.Monad.Exception.Asynchronous.Lazy
+
+
+load :: Read a => FilePath -> IO (Matrix a)
+load f_name
+    = do
+        f_contents <- readFile f_name
+        let parse_result = fromString '"' ',' f_contents
+        let csv = result parse_result
+        let matrix = fromLists $ map (map read) csv
+        return matrix
+
+-- TODO: Listings
+--loadListing :: FilePath -> IO [String, Matrix Float]
+
+main = do
+    matrix <- (load "test.csv")::(IO (Matrix Int))
+    print matrix

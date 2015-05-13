@@ -1,0 +1,266 @@
+from math import *
+
+import numpy
+
+import random
+
+import matplotlib.pyplot as plt
+from pylab import arange
+from random import randint
+
+import numpy as np
+import pylab as pl
+from matplotlib import collections  as mc
+
+def pendulum_th_ddot( I, b, torque, theta_dot ):
+    return (torque - b * theta_dot) / I
+    
+def standard_pendulum_th_ddot( b, g, l, theta, theta_dot, torque ):
+    return torque - ( b * theta_dot + g * sin(theta) / l )
+
+# Allows for partial data, etc.    
+class Trajectory:
+    def __init__(self):
+        self.timeline = []
+    def register( self, t, obs ):
+        self.timeline.append((t,obs))
+        # TODO Sort timeline...
+    def getSequence(self, name):
+        print self.timeline[-1]
+        T = []
+        X = []
+        for time, entry in self.timeline:
+            if name in entry:
+                T.append(time)
+                X.append(entry[name])
+        return T, X
+    def estimate(self, t):
+        # TODO: Find surrounding frames, linearly interpolate....
+        for time, entry in self.timeline:
+            if time > t:
+                return entry
+        return {}
+
+class DynamicSystem:
+    def sample_state(self):
+        raise NotImplementedError()
+    def f(self, x, t):
+        raise NotImplementedError()
+    def update(self, x, t, dt):
+        new_x = {}
+        for variable in x:
+            dxdt = self.f(x, t)
+            new_x[variable] = x[variable] + dt*dxdt[variable]
+        return new_x
+    def simulate(self, x_initial, t, dt=0.001):
+        time = 0
+        x = x_initial
+        traj = Trajectory()
+        while time < t:
+            traj.register(time, x)
+            x = self.update( x, time, dt )
+            time += dt
+        return traj
+        
+class ControlledSystem:
+    def sample_state(self):
+        raise NotImplementedError()
+    def sample_control(self):
+        raise NotImplementedError()
+    def f(self, x, t, u):
+        raise NotImplementedError()
+    def update(self, x, t, u, dt):
+        new_x = {}
+        for variable in x:
+            dxdt = self.f(x,t,u)
+            new_x[variable] = x[variable] + dt*dxdt[variable]
+        return new_x
+        
+class Controller:
+    def control_input(self, x):
+        raise NotImplementedError()
+    def control_input_tv(self, x, t):
+        return self.control_input(x)
+        
+class ClosedLoopSystem(DynamicSystem):
+    def __init__( self, system, controller ):
+        self.system = system
+        self.controller = controller
+    def f(self, x, t):
+        u = self.controller.control_input_tv(x, t)
+        return self.system.f( x, u )
+
+class ZeroController(Controller):
+    def __init__(self):
+        pass
+    def control_input(self, x):
+        return 0
+        
+class ConstantController(Controller):
+    def __init__(self, c):
+        self.c = c
+    def control_input(self, x):
+        return self.c
+
+class TVController(Controller):
+    def __init__(self, f):
+        self.f = f
+    def control_input_tv(self, x, t):
+        return self.f(t)
+        
+class LinearController(Controller):
+    def __init__(self, K):
+        self.K = K
+    def control_input(self, x):
+        return self.K * x
+
+class SimplePendulum(DynamicSystem):
+    def __init__(self, b, g, l):
+        self.b = b
+        self.g = g
+        self.l = l
+    def f(self, x):
+        th = x["th"]
+        th_dot = x["th_dot"]
+        return {"th":th_dot,
+                "th_dot": - ( self.b * th_dot + self.g * sin(th) / self.l )}
+               
+class ActuatedPendulum(ControlledSystem):
+    def __init__(self, b, g, l):
+        self.b = b
+        self.g = g
+        self.l = l
+    def f(self, x, u):
+        th = x["th"]
+        th_dot = x["th_dot"]
+        return {"th":th_dot,
+                "th_dot": u - ( self.b * th_dot + self.g * sin(th) / self.l )}
+                
+def UnactuatedPendulum( b, g, l ):
+    return ClosedLoopSystem( ActuatedPendulum( b, g, l ), ZeroController() )  
+
+class Swing(ControlledSystem):
+    def __init__( self, I_min, I_max, I_dot_max, b, k ):
+        # Used to validate states and controls...
+        self.I_min = I_min
+        self.I_max = I_max
+        self.I_dot_max = I_dot_max
+        
+        # System Parameters
+        self.b = b
+        self.k = k
+    def f(self, x, u):
+        th = x["th"]
+        th_dot = x["th_dot"]
+        I = x["I"]
+        I_dot = u
+        #print x
+        return {"th": th_dot,
+                "th_dot": - ( self.b * th_dot + self.k * sin(th) ) / I,
+                "I": I_dot}
+                
+"""def nearest( x, xs ):
+    def distance_sq(x,y):
+        x = numpy.array(x)
+        y = numpy.array(y)
+        return numpy.linalg.norm(x-y)
+    return min(xs, key=lambda y:distance_sq(x,y))
+    
+def extend( x ):
+    u = random.uniform(-1.0,1.0)
+    def f( x, u ):
+        th, th_dot = x
+        return (th_dot, standard_pendulum_th_ddot(b, g, l, th, th_dot, u) )
+    def update( x, u, dt ):
+        x1, x2 = x
+        x1_dot, x2_dot = f( x, u )
+        return (x1 + dt * x1_dot, x2 + dt * x2_dot)
+    return update( x, u, 0.1 )
+    
+def rrt( x_initial ):
+    live = set([x_initial])
+    all_p = set([x_initial])
+    segs = []
+    def sample_x():
+        return (random.uniform(-40,40), random.uniform(-40,40))
+    N = 10**5
+    for i in range(N):
+        if i%100 == 0:
+            print float(100*i)/(N), "%"
+        x_goal = sample_x()
+        if len(live) < 50:
+            x_root = nearest( x_goal, live )
+        else:
+            x_root = nearest( x_goal, random.sample(live, 40) )
+        if not x_root in live:
+            continue
+        live.remove(x_root)
+        for j in range(3):
+            x_extended = extend(x_root)
+            live.add(x_extended)
+            all_p.add(x_extended)
+            segs.append([x_root, x_extended])
+    return segs"""
+
+def plot(traj, name1, name2):
+    T, x1 = traj.getSequence(name1)
+    T, x2 = traj.getSequence(name2) #[ a for a,b in traj ], [ b for a,b in traj ])
+    plt.plot(x1, x2)
+
+#plt.xlabel('x1')
+#plt.ylabel('x2')
+
+pendulum_free = UnactuatedPendulum( 0.1, 10, 5 )
+swing = ClosedLoopSystem( Swing(0, 10, 1, 0.1, 2), ZeroController() )
+def f(t):
+    if t < 1:
+        return 1
+    if t < 2:
+        return -1
+    return 0
+
+def swingBangBang(T, tau, I_dot_max):
+    def f(t):
+        if t > T:
+            return f(t - T)
+        if t < tau:
+            return I_dot_max
+        if t < (T / 2)  - tau:
+            return 0
+        if t < (T / 2) + tau:
+            return -1 * I_dot_max
+        if t < T - tau:
+            return 0
+        return I_dot_max
+    return f
+#swingcc = ClosedLoopSystem( Swing(0, 10, 5, 0.1, 2), TVController(swingBangBang(5,.5,1) ) )
+swingcc = ClosedLoopSystem( Swing(0, 10, 5, 0.1, 2), TVController(swingBangBang(2.5,.5,1) ) )
+pendulum = ClosedLoopSystem( Swing(0, 10, 5, 0.0, 2), ZeroController() )
+swing2 = ClosedLoopSystem( Swing(0, 10, 1, 0.1, 2), TVController(f) )
+
+#pendulum = UnactuatedPendulum( 0, 10, 5 )
+
+#plot( pendulum_free.simulate( {"th":14, "th_dot":-3.5}, 200.0 ), "th", "th_dot" )
+#plot( pendulum_free.simulate( {"th":14, "th_dot":3.5}, 40.0 ), "th", "th_dot" )
+#plot( pendulum.simulate( {"th":14 - 2*pi, "th_dot":-3.5}, 200.0 ), "th", "th_dot" )
+# plot( pendulum.simulate( {"th":14, "th_dot":3.5}, 40.0 ), "th", "th_dot" )
+
+#plot( swing.simulate( {"th":14 - 2*pi, "th_dot":-1.5, "I":1.0}, 20.0 ), "th", "th_dot" )
+#plot( swing2.simulate( {"th":14 - 2*pi, "th_dot":-1.5, "I":1.0}, 20.0 ), "th", "th_dot" )
+x_0 = {'I': 1.0, 'th_dot': -2.0534396169989577, 'th': 7.442233486484738}
+plot( swingcc.simulate( x_0, 5.0 ), "th", "th_dot" )
+plot( pendulum.simulate( x_0, 7.0 ), "th", "th_dot" )
+
+"""
+lines = rrt((0, 0))
+c = np.array([(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)])
+
+lc = mc.LineCollection(lines, linewidths=2)
+fig, ax = pl.subplots()
+ax.add_collection(lc)
+ax.autoscale()
+ax.margins(0.1)
+"""
+
+plt.show()
+        

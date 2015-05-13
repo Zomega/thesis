@@ -1,0 +1,41 @@
+ 
+-- ||GOAL:
+-- || import qualified RapidlyExploringRandomTree as RRT
+-- || f = Dynamics {{Function StatePoint ControlInput}}
+-- || random = {{Make a Random instance}}
+-- || RRT.build random 10**3 f
+
+-- | Rapidly-Exploring Random Tree Framework
+
+-- Multiple Instances required?
+class RRTFramework a where
+    sampleState :: Random -> ( StatePoint, Random )
+    sampleControl :: Random -> StatePoint -> (ControlInput, Random)
+    nearestState :: [StatePoint] -> StatePoint -> StatePoint
+    approxControlInput :: StatePoint -> StatePoint -> ControlInput
+    forwardSimulate :: StatePoint -> ControlInput -> StatePoint
+    
+
+type RRT = Tree StatePoint ControlInput
+
+-- | Build an RRT without a goal.
+build :: Random -> Int -> RRT
+build _ 0 = empty
+build rand iters
+    = let rand', x_rand = sample rand
+          x_near = nearestState (nodes tree) x_rand
+          u_new = approxControlInput x_near x_rand
+          x_new = forwardSimulate x_near u_new
+          tree = build rand' $ iters - 1
+      in addLeaf (x_near, u_new, x_new)
+      
+-- | TODO: Let us expand the old trees....
+-- | Just build rand iters = build' rand iters empty
+build' :: Random -> Int -> RRT -> RRT 
+      
+-- | Build an RRT with a goal, but only in the forward direction...
+
+-- | Build an RRT with a goal in both directions at once...
+
+-- | Build an RRT where we forward bias the results buy adding extra nodes for randomly sampled controls.
+-- | TODO: Is this better than just warping the voroni sets?

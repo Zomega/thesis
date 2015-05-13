@@ -1,0 +1,6 @@
+module Utils.Plot where
+
+streamplot x y u v = do
+	pHandle <- runCommand "plot streamplot --style thickened"
+
+-- quiverplot x y u v = ...

@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+import numpy as np
+import matplotlib.pyplot as plt
+import click
+
+from MatrixIO import load
+
+# TODO: Click MatrixFile thing...
+
+@click.group()
+@click.pass_context
+@click.option('-X', type=click.Path(exists=True))
+@click.option('-Y', type=click.Path(exists=True))
+@click.option('-U', type=click.Path(exists=True))
+@click.option('-V', type=click.Path(exists=True))
+def vectorfield_plotters(ctx, x, y, u, v):
+	ctx.obj['X'] = load(x)
+	ctx.obj['Y'] = load(y)
+	ctx.obj['U'] = load(u)
+	ctx.obj['V'] = load(v)
+
+@vectorfield_plotters.command()
+@click.pass_context
+@click.option('--style', default='thickened', type=click.Choice(['autumn', 'cool', 'plain', 'thickened']))
+def streamplot(ctx, style):
+	X = ctx.obj['X']
+	Y = ctx.obj['Y']
+
+	U = ctx.obj['U']
+	V = ctx.obj['V']
+
+	speed = np.sqrt(U*U + V*V)
+	lw = 5*speed/speed.max()
+
+	if style == 'autumn':
+		plt.streamplot(X, Y, U, V, color=speed, linewidth=2, cmap=plt.cm.autumn)
+		plt.colorbar()
+	if style == 'cool':
+		plt.streamplot(X, Y, U, V, color=speed, linewidth=2, cmap=plt.cm.cool)
+		plt.colorbar()
+	if style == 'plain':
+		plt.streamplot(X, Y, U, V)
+	if style == 'thickened':
+		plt.streamplot(X, Y, U, V, color='k', linewidth=lw)
+
+	plt.show()
+
+@vectorfield_plotters.command()
+@click.pass_context
+def quiverplot(ctx):
+	X = ctx.obj['X']
+	Y = ctx.obj['Y']
+
+	U = ctx.obj['U']
+	V = ctx.obj['V']
+	plt.quiver(X, Y, U, V) # TODO: Autoscale... use speed from streamplot?
+	plt.show()
+
+if __name__ == '__main__':
+    vectorfield_plotters(obj={})

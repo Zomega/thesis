@@ -1,0 +1,32 @@
+-- | All these methods work as follows:
+-- |
+-- | Given a feasible (or near feasible trajectory), an HJB style cost metric, ControlledSystem System, will attempt to improve that trajectory to a better one.
+-- | Uses Optimize.NonLinear as a backend in all cases.
+
+import qualified RapidlyExploringRandomTree as RRT
+
+-- | Represents a Trajectory.
+data Trajectory = Trajectory [(StatePoint,ControlInput)] Float
+
+data StateTrajectory = StateTrajectory [StatePoint] Float
+data ControlTrajectory = ControlTrajectory [ControlInput] Float
+
+-- TODO: Converters.
+
+-- | This function should be effectivly idempotent, i.e. once a trajectory is optimized, it cannot be optimized further.
+optimize_trajectory :: ControlledSystem -> TrajectoryCostMetric -> Trajectory -> Trajectory
+optimize_trajectory system cost_metric trajectory = colocation system cost_metric trajectory []
+
+-- | Will return an optimized trajectory.
+-- | TODO Probably needs to take in a default dt
+create_trajectory ::  ControlledSystem -> TrajectoryCostMetric -> StatePoint -> StatePoint -> Trajectory
+create_trajectory system cost_metric start goal
+    = let rough_trajectory = RRT.create_trajectory system start goal
+          trajectory = optimize_trajectory system cost_metric rough_trajectory
+
+-- | Three implemented methods.
+shooting_method -- | Optimize over u and dt only, with a constraint that we end where we want too.
+direct_transcription -- | Optimize over both x, u, add dynamics contraints x_(n+1) = x_n + dt 
+colocation -- | Like direct transcription, but force the dynamics to work at the so called "knot points" -- midpoints of the associated cubic spline in x.
+
+

@@ -1,0 +1,77 @@
+import Data.List (sort)
+import System.Random
+import Control.Monad (replicateM)
+
+type Point = (Float, Float)
+
+d :: Point -> Point -> Float
+d (x1, y1) (x2, y2) = sqrt $ (x1-x2)^2 + (y1-y2)^2
+
+z :: Point -> Float
+z (x1, y1) = min 0.4 $ 0.7 * (x1 + y1^2)
+
+qd' = qd z
+
+qd :: (Point -> Float) -> Point -> Point -> Float
+qd z x y = (d x y) + (z x) - (z y)
+
+sorted_index xs = map snd . sort $ zip xs [0..]
+
+maxn :: [Float] -> Int
+maxn xs = head $ sorted_index xs
+
+approx_maxn :: Float -> [Float] -> Maybe Int
+approx_maxn eps xs
+    = let [i,j] = take 2 $ sorted_index xs
+      in if (xs !! j) / (xs !! i) >= (1 + eps)
+         then Just i
+         else Nothing
+
+voroni_class :: (Point -> Point -> Float) -> [Point] -> Point -> Int 
+voroni_class d centers x = maxn $ map (d x) centers
+
+quasivoroni_class :: (Point -> Point -> Float) -> [Point] -> Point -> Int 
+quasivoroni_class d centers x = maxn $ map (\center -> d center x) centers
+
+approx_quasivoroni_class :: (Point -> Point -> Float) -> Float -> [Point] -> Point -> Maybe Int 
+approx_quasivoroni_class d eps centers x = approx_maxn eps $ map (\center -> d center x) centers
+
+type Color = Int
+type ScatterPlot = [(Point, Color)]
+
+csv :: ScatterPlot -> String
+csv [] = ""
+csv (((x,y),color):rest) =  show x
+                       ++ ", "
+                       ++ show y
+                       ++ ", "
+                       ++ show color
+                       ++ "\n"
+                       ++ csv rest
+                       
+voroni_plot :: (Point -> Point -> Float) -> [Point] -> [Point] -> ScatterPlot
+voroni_plot d centers points =
+    zip points $ map (voroni_class d centers) points
+    
+quasivoroni_plot :: (Point -> Point -> Float) -> [Point] -> [Point] -> ScatterPlot
+quasivoroni_plot qd centers points =
+    zip points $ map (quasivoroni_class qd centers) points
+    
+approx_quasivoroni_plot :: (Point -> Point -> Float) -> Float -> [Point] -> [Point] -> ScatterPlot
+approx_quasivoroni_plot _ _ _ [] = []
+approx_quasivoroni_plot qd eps centers (point:rest)
+    = case approx_quasivoroni_class qd eps centers point of
+          Nothing -> approx_quasivoroni_plot qd eps centers rest
+          Just color -> (point, color):approx_quasivoroni_plot qd eps centers rest
+                       
+cartProd xs ys = [(x,y) | x <- xs, y <- ys]
+
+n_c = 2
+n = 3 * 10^4
+main = do
+    c_x <- replicateM n_c (randomIO :: IO Float)
+    c_y <- replicateM n_c (randomIO :: IO Float)
+    x <- replicateM n (randomIO :: IO Float)
+    y <- replicateM n (randomIO :: IO Float)
+    putStrLn $ csv $ approx_quasivoroni_plot d 0.5 (zip c_x c_y) (zip x y)
+    --putStrLn $ csv $ voroni_plot d (zip c_x c_y) (zip x y)

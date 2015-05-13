@@ -1,0 +1,110 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun May 20 17:08:35 2012
+
+@author: Steve
+"""
+
+from __future__ import division
+import math
+import pygame
+import random
+
+#images2gif converts multiple images to a single animated GIF. Requires numpy
+#and PIL. Download from http://visvis.googlecode.com/hg/vvmovie/images2gif.py
+import images2gif
+import PIL
+
+def prob_of_astatine(num_gridpoints):
+    """
+    Assume that there is total 1 gram of U238, divided equally into
+    num_gridpoints pieces. Calculate probability at a given moment that a given
+    piece has an astatine. All times are in seconds. This function is used only
+    to set up the first frame of the animation.
+    """
+    uranium_atoms_per_gridpoint = 6e23/238 / num_gridpoints
+    return uranium_atoms_per_gridpoint * 2e-21
+
+def prob_of_astatine_decay(delay):
+    """
+    Assuming that there is an astatine at a certain gridpoint at time t, this
+    is the probability that it is gone at time (t+delay). All times are in
+    seconds. Neglect rare possibility of a second astatine appearing at this
+    site.
+    """
+    astatine_halflife = 1.5
+    return 1 - 0.5 ** (delay / astatine_halflife)
+
+def prob_of_astatine_appearance(num_gridpoints, delay):
+    """
+    Assume that there is total 1 gram of U238, divided equally into
+    num_gridpoints pieces. At a certain gridpoint at time t, this piece does NOT
+    contain an astatine. Calculate probability that at time (t+delay), it
+    DOES contain an astatine. All times are in seconds. Neglect rare possibility
+    of more than one astatine appearing at the same site.
+    """
+    uranium_atoms_per_gridpoint = 6e23/238 / num_gridpoints
+    uranium_halflife = 1.4e17
+    uranium_decay_constant = math.log(2)/uranium_halflife
+    uranium_decays_per_gridpoint = uranium_atoms_per_gridpoint * uranium_decay_constant * delay
+    return uranium_decays_per_gridpoint * 0.0002
+
+def main():
+    random.seed(0)
+    
+    #1g uranium is split into 400 = 20^2 chunks, one at each gridpoint. We
+    #ignore the rare possibility of the same chunk of uranium having 2 or more
+    #astatitines; therefore each chunk either has 1 or 0 astatines. If it's 1,
+    #a circle is drawn centered at this gridpoint.
+    gridpoints_per_row = 20
+    num_gridpoints = gridpoints_per_row ** 2
+    
+    delay_per_frame = 0.1 #in seconds
+    frames_in_animation = 300
+    
+    bgcolor = (255,255,255) #white
+    outlinecolor = (0,0,0) #black
+    astatinecolor = (255,0,0) #red
+
+    #surf_size is the number of pixels across whole image
+    surf_size = gridpoints_per_row * 5 + 10
+    
+    #gridpoints[n] = (x,y) means the n'th gridpoint is located at pixel
+    #coordinaate (x,y).
+    gridpoints = [(i*5+5,j*5+5) for i in xrange(gridpoints_per_row)
+                                    for j in xrange(gridpoints_per_row)]
+    
+    #astatine_present[n] is True if there is an astatine at position n right
+    #now. Set up this array for the first frame.
+    astatine_present = [random.random() < prob_of_astatine(num_gridpoints)
+                                            for n in xrange(num_gridpoints)]
+    
+    for frame in xrange(frames_in_animation):
+        
+        #Make and save drawing
+        surf = pygame.Surface((surf_size,surf_size))
+        surf.fill(bgcolor); #color surface white
+        pygame.draw.lines(surf,outlinecolor,True,
+                      [(0,0),(0,surf_size-1),
+                       (surf_size-1,surf_size-1),(surf_size-1,0)],1)
+        for n in xrange(num_gridpoints):
+            if astatine_present[n]:
+                pygame.draw.circle(surf,astatinecolor,gridpoints[n],2)
+        pygame.image.save(surf,'frame' + str(frame) + '.png')
+        
+        #Update for next frame
+        for n in xrange(num_gridpoints):
+            if astatine_present[n]:
+                if random.random() < prob_of_astatine_decay(delay_per_frame):
+                    astatine_present[n] = False
+            else:
+                if random.random() < prob_of_astatine_appearance(num_gridpoints, delay_per_frame):
+                    astatine_present[n] = True
+    
+    #Convert to animated GIF
+    PILimages = [PIL.Image.open('frame' + str(frame) + '.png')
+                   for frame in xrange(frames_in_animation)]
+    print "GOT HERE"
+    images2gif.writeGif('finalmovie.gif', PILimages, duration=0.1, repeat=True, dither=False, 
+                nq=0, subRectangles=True, dispose=None)
+    return

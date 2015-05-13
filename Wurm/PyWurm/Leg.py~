@@ -1,0 +1,105 @@
+from ControlledSystem import ControlledSystem
+from math import sin, cos, sqrt, pi
+
+# The leg can only enter and exit stance at I_max
+class Leg(ControlledSystem):
+    def __init__( self, I_min, I_max, I_dot_max, a, k, c, phi, b ):
+        # Used to validate states and controls...
+        self.I_min = I_min
+        self.I_max = I_max
+        self.I_dot_max = I_dot_max
+        
+        # System Parameters
+        self.b = b
+        self.A = 2*a*k*c*sin(phi / 2)
+        self.B = 4*a*a*k*cos(phi / 4)
+
+    def f(self, x, u):
+        th = x["th"]
+        th_dot = x["th_dot"]
+        I = x["I"]
+        I_dot = u
+        return {"th": th_dot,
+                "th_dot": - ( self.b * th_dot + self.A * sin(th) + self.B * sin(th / 2) ) / I,
+                "I": I_dot}
+
+import pygame
+
+def drawGait(screen, leg, traj, t):
+    T = traj.timeline[-1][0] # Time for a half step.
+    th_0 = traj.timeline[0][1]["th"]
+
+    t_residue = t
+    n = 0
+    state = False # Describes which legs are moving...
+    while t_residue > T:
+        t_residue -= T
+        n += 1
+        state = not state
+    if state:
+        state = 1
+    else:
+        state = 0
+
+    x = traj.estimate(t_residue)
+
+    def b_th(i,n):
+        if n > 1:
+            return -th_0 + b_th(i, n-1)
+        return i * pi / 3
+
+    def th(i):
+        if i % 2 == state:
+            return b_th(i,n)
+        return b_th(i,n) + x["th"]
+
+    center = (250, 250)
+    c_x, c_y = center
+    l_max = 50 * sqrt( leg.I_max )
+    pygame.draw.circle(screen, (0,0,0), center, 5)
+
+    def leg_state(i):
+        if i % 2 == state:
+            l = l_max
+            planted = True
+        else:
+            l = 50 * sqrt( x["I"] )
+            planted = False
+        theta = th(i)
+
+        return l, theta, planted
+
+    def draw_leg(i):
+        
+        l, theta, planted = leg_state(i)
+
+        pole_end = (int(c_x + l_max * sin(theta)), int(c_y + l_max * cos(theta)))
+        bob = (int(c_x + l * sin(theta)), int(c_y + l * cos(theta)))
+        pygame.draw.line(screen, (0,0,0), center, pole_end,3)
+        pygame.draw.circle(screen, (0,0,255), bob, 14, 0)
+        if planted:
+            pygame.draw.circle(screen, (0,0,0), pole_end, 20, 3)
+
+    def draw_spring(start):
+        end = (start + 1) % 6
+	th_start = th(start)
+	th_end = th(end)
+	
+	a = 50
+
+	att_start = (int(c_x + a * sin(th_start)), int(c_y + a * cos(th_start)))
+	att_end = (int(c_x + a * sin(th_end)), int(c_y + a * cos(th_end)))
+
+	length = sqrt( (att_start[0] - att_end[0]) ** 2 + (att_start[1] - att_end[1]) ** 2 ) / 50.0
+	def color(l):
+		if l < 1:
+			alpha = 1 - l
+			return (50 + alpha*175,50,50)
+		return (100,255,100)
+        pygame.draw.line(screen, color(length), att_start, att_end,3)
+
+    for i in range(6):
+        draw_leg(i)
+        draw_spring(i)
+    # TODO: Draw springs.
+
